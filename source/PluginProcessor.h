@@ -3,16 +3,19 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "Echo700.h"
+#include "ath_dsp/control/Events.h"
 
 #if (MSVC)
 #include "ipps.h"
 #endif
 
-class PluginProcessor : public juce::AudioProcessor
+class PluginProcessor : public juce::AudioProcessor, public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     PluginProcessor();
     ~PluginProcessor() override;
+
+    void parameterChanged (const juce::String& parameterId, float newValue) override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -39,6 +42,10 @@ public:
 
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    juce::XmlElement pluginInstanceSettings;
+    juce::AudioProcessorValueTreeState treeState;
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
 private:
 

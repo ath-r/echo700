@@ -1,5 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "juce_core/juce_core.h"
+#include <cmath>
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
@@ -10,12 +12,60 @@ PluginProcessor::PluginProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
+    treeState(*this, nullptr, "PARAMETER", createParameterLayout()),
+    pluginInstanceSettings("pluginInstanceSettings")
 {
+    treeState.addParameterListener("prefilter_cutoff", this);
+    
+    for (auto* param : getParameters())
+    {
+        if (auto* paramWithID = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
+        {
+            auto paramID = paramWithID->getParameterID();
+            treeState.addParameterListener(paramID, this);
+        }
+    }
 }
 
 PluginProcessor::~PluginProcessor()
 {
+    for (auto* param : getParameters())
+    {
+        if (auto* paramWithID = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
+        {
+            auto paramID = paramWithID->getParameterID();
+            treeState.removeParameterListener(paramID, this);
+        }
+    }
+}
+
+void PluginProcessor::parameterChanged(const juce::String& parameterId, float newValue)
+{
+    if (parameterId == "prefilter_cutoff")
+    {
+        echo700left.setPrefilterCutoff(newValue);
+        echo700right.setPrefilterCutoff(newValue);
+    }
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> 
+                    (
+                    juce::ParameterID {"prefilter_cutoff", 0},
+                    "Pre LP",
+                    juce::NormalisableRange<float>(1000, 14e3, 100.0, 0.5f),
+                    14e3,
+                    "Cutoff",
+                    juce::AudioProcessorParameter::Category::genericParameter,
+                    [](float value, int){ return juce::String(value) + juce::String(" Hz"); }
+                    )
+                );
+
+    return {params.begin(), params.end()};
 }
 
 //==============================================================================
@@ -91,6 +141,12 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     
     echo700left.setContext(Ath::Dsp::Context(sampleRate));
     echo700right.setContext(Ath::Dsp::Context(sampleRate));
+
+    auto num = treeState.state.getNumChildren();
+    for (auto param : getParameters())
+    {
+        param->sendValueChangedMessageToListeners(param->getValue());
+    }
 }
 
 void PluginProcessor::releaseResources()
@@ -154,17 +210,32 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
 //==============================================================================
 void PluginProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
-    juce::ignoreUnused (destData);
+    auto state = treeState.copyState();
+
+    auto xml = std::make_unique<juce::XmlElement>("pluginInstanceTree");
+    auto xmlSettings = std::make_unique<juce::XmlElement>(pluginInstanceSettings);
+
+    std::unique_ptr<juce::XmlElement> pluginValueTree (state.createXml());
+
+    xml->addChildElement(xmlSettings.release());
+    xml->addChildElement(pluginValueTree.release());
+    copyXmlToBinary (*xml, destData);
 }
 
 void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
-    juce::ignoreUnused (data, sizeInBytes);
+    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+    if (xmlState.get() != nullptr)
+    {
+        if (xmlState->hasTagName("pluginInstanceTree"))
+        {
+            auto state = xmlState->getChildByName(treeState.state.getType());
+            if (state != nullptr) treeState.replaceState (juce::ValueTree::fromXml (*state));
+
+            auto settings = xmlState->getChildByName("pluginInstanceSettings");
+            if (settings != nullptr) pluginInstanceSettings = *settings;
+        }        
+    }
 }
 
 //==============================================================================

@@ -2,6 +2,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "Echo700.h"
+
 #if (MSVC)
 #include "ipps.h"
 #endif
@@ -39,5 +41,8 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
 private:
+
+    Ath::Echo700::Echo700 echo700left, echo700right;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 };

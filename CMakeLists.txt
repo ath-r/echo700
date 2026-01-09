@@ -37,7 +37,7 @@ set(BUNDLE_ID "com.ath.echo700")
 
 # Change me! Set the plugin formats you want built
 # Valid choices: AAX Unity VST VST3 AU AUv3 Standalone
-set(FORMATS Standalone AU VST3 AUv3)
+set(FORMATS Standalone VST3 CLAP)
 
 # For simplicity, the name of the CMake project is also the name of the target
 project(${PROJECT_NAME} VERSION ${CURRENT_VERSION})
@@ -71,7 +71,7 @@ juce_add_plugin("${PROJECT_NAME}"
     COPY_PLUGIN_AFTER_BUILD TRUE
 
     NEEDS_MIDI_INPUT TRUE
-    IS_SYNTH TRUE
+    IS_SYNTH FALSE
 
     # Change me!
     # A four-character plugin id
@@ -96,7 +96,7 @@ add_library(SharedCode INTERFACE)
 
 clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"
     CLAP_ID "${BUNDLE_ID}"
-    CLAP_FEATURES instrument synthesizer)
+    CLAP_FEATURES audio-effect delay reverb)
 
 # Enable fast math, C++20 and a few other target defaults
 include(SharedCodeDefaults)

@@ -16,7 +16,7 @@ PluginProcessor::PluginProcessor()
     treeState(*this, nullptr, "PARAMETER", createParameterLayout()),
     pluginInstanceSettings("pluginInstanceSettings")
 {
-    treeState.addParameterListener("prefilter_cutoff", this);
+    treeState.addParameterListener("prelowpass_cutoff", this);
     
     for (auto* param : getParameters())
     {
@@ -42,10 +42,15 @@ PluginProcessor::~PluginProcessor()
 
 void PluginProcessor::parameterChanged(const juce::String& parameterId, float newValue)
 {
-    if (parameterId == "prefilter_cutoff")
+    if (parameterId == "prelowpass_cutoff")
     {
-        echo700left.setPrefilterCutoff(newValue);
-        echo700right.setPrefilterCutoff(newValue);
+        echo700left.setPreLowPassCutoff(newValue);
+        echo700right.setPreLowPassCutoff(newValue);
+    }
+    else if (parameterId == "prehighpass_cutoff")
+    {
+        echo700left.setPreHighPassCutoff(newValue);
+        echo700right.setPreHighPassCutoff(newValue);
     }
 }
 
@@ -55,7 +60,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
 
     params.push_back (std::make_unique<juce::AudioParameterFloat> 
                     (
-                    juce::ParameterID {"prefilter_cutoff", 0},
+                    juce::ParameterID {"prelowpass_cutoff", 0},
                     "Pre LP",
                     juce::NormalisableRange<float>(1000, 14e3, 100.0, 0.5f),
                     14e3,
@@ -64,6 +69,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
                     [](float value, int){ return juce::String(value) + juce::String(" Hz"); }
                     )
                 );
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> 
+        (
+        juce::ParameterID {"prehighpass_cutoff", 0},
+        "Pre HP",
+        juce::NormalisableRange<float>(30, 1e3, 10.0, 0.5f),
+        100,
+        "Cutoff",
+        juce::AudioProcessorParameter::Category::genericParameter,
+        [](float value, int){ return juce::String(value) + juce::String(" Hz"); }
+        )
+    );
 
     return {params.begin(), params.end()};
 }
